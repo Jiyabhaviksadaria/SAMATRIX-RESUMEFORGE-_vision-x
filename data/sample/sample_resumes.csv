@@ -1,0 +1,16 @@
+candidate_name,candidate_email,job_role,experience_years,education_level,resume_text
+Alice Smith,alice@example.com,Data Scientist,5,Master,Experienced Data Scientist skilled in Python Pandas NumPy Scikit-Learn TensorFlow SQL Machine Learning and NLP. Built end-to-end classification and regression pipelines for enterprise clients.
+Bob Jones,bob@example.com,Software Engineer,3,Bachelor,Full Stack Software Engineer proficient in React TypeScript Node.js FastAPI PostgreSQL Docker and AWS. Developed scalable web applications and microservices.
+Charlie Brown,charlie@example.com,DevOps Engineer,6,Bachelor,Senior DevOps Specialist with hands-on experience in AWS Docker Kubernetes Jenkins Terraform CI/CD automation and Linux server administration.
+Diana Prince,diana@example.com,Data Scientist,4,PhD,AI Researcher and Data Scientist specializing in Deep Learning PyTorch NLP HuggingFace Transformers and Statistical Modeling. Published ML research papers.
+Evan Wright,evan@example.com,Product Manager,7,Master,Data-driven Product Manager with expertise in Agile Scrum product roadmap strategy user research AB testing SQL and cross-functional leadership.
+Fiona Gallagher,fiona@example.com,Frontend Developer,2,Bachelor,Creative Frontend Developer specializing in React Next.js TypeScript Tailwind CSS Figma UI UX design and responsive web application development.
+George Clark,george@example.com,Data Engineer,5,Master,Data Engineer experienced in Big Data Spark Hadoop Python SQL PostgreSQL Airflow Kafka Snowflake and cloud data warehouse pipelines.
+Hannah Abbott,hannah@example.com,Software Engineer,4,Bachelor,Backend Engineer focusing on Java Spring Boot REST APIs Microservices Redis MySQL and Cloud deployment on AWS.
+Ian Malcolm,ian@example.com,Data Scientist,6,PhD,Lead ML Engineer proficient in Python Scikit-Learn XGBoost MLOps Docker KubeFlow Statistics and predictive analytics modeling.
+Julia Roberts,julia@example.com,UX Designer,3,Bachelor,UI UX Designer proficient in Figma Adobe XD Wireframing User Research Information Architecture and Prototyping for web and mobile apps.
+Kevin Bacon,kevin@example.com,DevOps Engineer,4,Bachelor,Cloud Infrastructure Engineer experienced in Terraform Docker Kubernetes GCP Ansible Bash and CI CD pipelines.
+Laura Croft,laura@example.com,Product Manager,5,Master,Technical Product Manager with background in software development Agile user stories KPI tracking analytics and stakeholder communication.
+Michael Scott,michael@example.com,Software Engineer,2,Bachelor,Junior Software Developer proficient in Python JavaScript React HTML CSS Git and SQL databases.
+Nina Williams,nina@example.com,Frontend Developer,4,Bachelor,Senior UI Developer experienced in Angular React TypeScript WebSockets CSS Modules web performance and accessibility.
+Oscar Isaac,oscar@example.com,Data Engineer,3,Master,ETL Developer skilled in Python SQL PySpark AWS Redshift Data Modeling and pipeline monitoring.

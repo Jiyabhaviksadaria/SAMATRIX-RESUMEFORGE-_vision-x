@@ -1,0 +1,12 @@
+{
+  "Programming": ["python", "java", "c++", "c#", "javascript", "typescript", "go", "rust", "ruby", "php", "scala", "kotlin", "swift", "r", "bash", "shell", "sql"],
+  "Machine Learning": ["scikit-learn", "tensorflow", "pytorch", "keras", "xgboost", "lightgbm", "catboost", "nltk", "spacy", "opencv", "huggingface", "transformers", "bert", "llm", "rag", "computer vision", "nlp", "deep learning", "machine learning"],
+  "Data Science": ["pandas", "numpy", "scipy", "matplotlib", "seaborn", "plotly", "power bi", "tableau", "spark", "hadoop", "data analysis", "data mining", "statistics", "a/b testing"],
+  "Web": ["react", "next.js", "vue", "angular", "node.js", "express", "fastapi", "django", "flask", "html", "css", "tailwind", "rest api", "graphql", "websockets"],
+  "Cloud": ["aws", "azure", "gcp", "amazon web services", "google cloud", "docker", "kubernetes", "terraform", "cloudformation", "serverless", "lambda"],
+  "DevOps": ["git", "github", "gitlab", "ci/cd", "jenkins", "docker", "kubernetes", "ansible", "linux", "nginx"],
+  "Databases": ["postgresql", "mysql", "mongodb", "redis", "elasticsearch", "sqlite", "oracle", "dynamodb", "snowflake", "bigquery"],
+  "Soft Skills": ["leadership", "communication", "problem solving", "teamwork", "project management", "agile", "scrum", "analytical skills", "critical thinking", "mentorship"],
+  "Business": ["product management", "strategy", "marketing", "sales", "finance", "business analysis", "stakeholder management", "kpi"],
+  "Design": ["figma", "ui/ux", "adobe xd", "photoshop", "illustrator", "wireframing", "user research", "prototyping"]
+}

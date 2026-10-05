@@ -1,4 +1,5 @@
 import re
+import unicodedata
 import pandas as pd
 from typing import List, Tuple, Optional
 
@@ -20,6 +21,31 @@ BASIC_STOPWORDS = {
     "who", "who's", "whom", "why", "why's", "with", "won't", "would", "wouldn't", "you", "you'd", "you'll",
     "you're", "you've", "your", "yours", "yourself", "yourselves"
 }
+
+
+def preprocess_text(text) -> str:
+    """Deterministic lightweight cleanup of extracted resume text.
+
+    Safe for any input (None, empty string, non-string). Preserves technical
+    tokens (C++, C#, .NET, Node.js, etc.) and meaningful punctuation; does
+    NOT stem, lemmatize, or remove stopwords.
+    """
+    if not isinstance(text, str):
+        return ""
+    # Unicode normalization (encoding artifacts, compatibility chars)
+    text = unicodedata.normalize("NFKC", text)
+    # Normalize line breaks
+    text = text.replace("\r\n", "\n").replace("\r", "\n")
+    # Remove obvious HTML/markup tags
+    text = re.sub(r"<[^>]+>", " ", text)
+    # Remove common encoding artifacts
+    for artifact in ("\ufeff", "\u200b", "\u200e", "\u200f", "\ufffd", "\x00"):
+        text = text.replace(artifact, "")
+    # Normalize repeated whitespace while keeping paragraph breaks
+    text = re.sub(r"[ \t]+", " ", text)
+    text = re.sub(r" *\n *", "\n", text)
+    text = re.sub(r"\n{3,}", "\n\n", text)
+    return text.strip()
 
 
 def remove_urls(text: str) -> str:

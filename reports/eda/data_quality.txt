@@ -1,0 +1,57 @@
+Dataset Summary
+---------------
+Total resumes: 2500
+Number of classes: 24
+Largest class: FINANCE (134)
+Smallest class: BPO (22)
+Missing texts: 1
+Empty texts: 1
+Very short resumes (<50 words): 1
+Duplicate filenames: 0
+Exact duplicate texts: 18
+Duplicate groups: 18
+
+Text Length (words)
+-------------------
+Minimum: 0
+Maximum: 5190
+Median: 759
+Mean: 811.81
+
+Text Length (characters)
+------------------------
+Minimum: 0
+Maximum: 35123
+Median: 5554
+Mean: 5929.75
+
+Class Distribution
+------------------
+ACCOUNTANT: 118
+ADVOCATE: 118
+AGRICULTURE: 63
+APPAREL: 97
+ARTS: 103
+AUTOMOBILE: 36
+AVIATION: 117
+BANKING: 115
+BPO: 22
+BUSINESS-DEVELOPMENT: 120
+CHEF: 118
+CONSTRUCTION: 112
+CONSULTANT: 115
+DESIGNER: 107
+DIGITAL-MEDIA: 96
+ENGINEERING: 118
+FINANCE: 134
+FITNESS: 117
+HEALTHCARE: 115
+HR: 110
+INFORMATION-TECHNOLOGY: 120
+PUBLIC-RELATIONS: 111
+SALES: 116
+TEACHER: 102
+
+Class Imbalance Note
+--------------------
+Max/min class-size ratio: 6.09. Minority classes are reported for Member 2; no resampling was applied.

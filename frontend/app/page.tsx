@@ -1,385 +1,332 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
-import Navbar from "@/components/Navbar";
-import HackathonWizard from "@/components/HackathonWizard";
-import DatasetProfiler from "@/components/DatasetProfiler";
-import ModelBenchmark from "@/components/ModelBenchmark";
-import ResumeAnalyzer from "@/components/ResumeAnalyzer";
-import JobMatcher from "@/components/JobMatcher";
-import CandidateRanker from "@/components/CandidateRanker";
-import { Sparkles, Brain, Cpu, Layers, GitCompare, Award, CheckCircle2 } from "lucide-react";
+import React, { useState, useCallback } from "react";
+import {
+  UploadCloud, FileText, X, Sparkles, Brain, Cpu, Layers, FileCheck2,
+  CheckCircle2, AlertTriangle, ArrowRight, RotateCcw, Activity, GraduationCap,
+} from "lucide-react";
+
+type Stage = "IDLE" | "FILE_SELECTED" | "ANALYZING" | "SUCCESS" | "ERROR";
+
+interface TopPrediction { category: string; confidence: number }
+interface ClassifyResult {
+  filename: string;
+  predicted_category: string;
+  confidence: number;
+  top_predictions: TopPrediction[];
+  extracted_text_length: number;
+  model: string;
+}
+
+function ResultView({ result, onReset }: { result: ClassifyResult; onReset: () => void }) {
+  return (
+    <div className="mt-6 space-y-6">
+      <div className="rounded-2xl border border-cyan-500/30 bg-cyan-500/5 p-8 text-center">
+        <p className="text-xs uppercase tracking-widest text-cyan-300">Predicted Category</p>
+        <p className="mt-2 text-3xl md:text-4xl font-extrabold text-white">{result.predicted_category}</p>
+        <div className="mt-5 max-w-md mx-auto">
+          <div className="flex justify-between text-xs text-slate-400 mb-1">
+            <span>Model Score</span><span>{(result.confidence * 100).toFixed(1)}%</span>
+          </div>
+          <div className="h-3 rounded-full bg-slate-800">
+            <div className="h-3 rounded-full bg-gradient-to-r from-cyan-400 to-indigo-500" style={{ width: `${Math.min(result.confidence * 100, 100)}%` }} />
+          </div>
+        </div>
+        <p className="mt-3 text-xs text-slate-500">AI Classification Complete</p>
+      </div>
+
+      <div className="grid sm:grid-cols-3 gap-4">
+        <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-4">
+          <p className="text-xs text-slate-500">File</p>
+          <p className="text-sm text-slate-200 mt-1 truncate">{result.filename}</p>
+        </div>
+        <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-4">
+          <p className="text-xs text-slate-500">Extracted Text Length</p>
+          <p className="text-sm text-slate-200 mt-1">{result.extracted_text_length.toLocaleString()} chars</p>
+        </div>
+        <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-4">
+          <p className="text-xs text-slate-500">Processing Status</p>
+          <p className="text-sm text-emerald-300 mt-1">Success</p>
+        </div>
+      </div>
+
+      <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-6">
+        <h4 className="text-sm font-semibold text-slate-200 mb-4">Top Predictions</h4>
+        <div className="space-y-3">
+          {result.top_predictions.map((p) => (
+            <div key={p.category}>
+              <div className="flex justify-between text-xs text-slate-400">
+                <span>{p.category}</span><span>{(p.confidence * 100).toFixed(1)}%</span>
+              </div>
+              <div className="h-2 rounded-full bg-slate-800 mt-1">
+                <div className="h-2 rounded-full bg-cyan-500/70" style={{ width: `${Math.min(p.confidence * 100, 100)}%` }} />
+              </div>
+            </div>
+          ))}
+        </div>
+        <p className="mt-4 text-[11px] text-slate-600">Scores are relative model decision scores, not calibrated probabilities.</p>
+      </div>
+
+      <button onClick={onReset} className="inline-flex items-center gap-2 rounded-xl border border-slate-700 hover:border-slate-500 px-5 py-2.5 text-sm text-slate-300 transition">
+        <RotateCcw className="h-4 w-4" /> Analyze another resume
+      </button>
+    </div>
+  );
+}
 
 export default function DashboardPage() {
-  const [activeTab, setActiveTab] = useState<"profiler" | "analyzer" | "matcher" | "ranker">("profiler");
-  const [profileData, setProfileData] = useState<any>(null);
-  const [metricsData, setMetricsData] = useState<any>(null);
-  const [analysisResult, setAnalysisResult] = useState<any>(null);
-  const [matchResult, setMatchResult] = useState<any>(null);
-  const [rankings, setRankings] = useState<any[]>([]);
-  const [predictionResult, setPredictionResult] = useState<any>(null);
+  const [stage, setStage] = useState<Stage>("IDLE");
+  const [file, setFile] = useState<File | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [result, setResult] = useState<ClassifyResult | null>(null);
+  const [error, setError] = useState<string>("");
+  const [step, setStep] = useState(0);
+  const [isDemo, setIsDemo] = useState(false);
 
-  const [isLoadingDemo, setIsLoadingDemo] = useState(false);
-  const [isUploading, setIsUploading] = useState(false);
-  const [isTraining, setIsTraining] = useState(false);
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [isMatching, setIsMatching] = useState(false);
-  const [isRanking, setIsRanking] = useState(false);
-  const [isPredicting, setIsPredicting] = useState(false);
+  const pickFile = (f: File | null) => {
+    if (!f) return;
+    if (!f.name.toLowerCase().endsWith(".pdf")) {
+      setError("Please upload a valid PDF.");
+      setStage("ERROR");
+      return;
+    }
+    setFile(f);
+    setStage("FILE_SELECTED");
+    setError("");
+  };
 
-  const API_BASE = "http://localhost:8000";
-
-  // Fetch metrics on mount
-  useEffect(() => {
-    fetchMetrics();
+  const onDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    pickFile(e.dataTransfer.files?.[0] ?? null);
   }, []);
 
-  const fetchMetrics = async () => {
+  const runAnalysis = async (f: File) => {
+    setStage("ANALYZING");
+    setStep(1);
+    const form = new FormData();
+    form.append("file", f);
+    const t1 = setTimeout(() => setStep(2), 600);
+    const t2 = setTimeout(() => setStep(3), 1200);
     try {
-      const res = await fetch(`${API_BASE}/metrics`);
+      const res = await fetch("/api/classify", { method: "POST", body: form })
+        .catch(() => { throw new Error("Unable to connect to the AI service.\nPlease make sure the backend is running."); });
       const data = await res.json();
-      if (data.success) {
-        setMetricsData(data.data);
-      }
-    } catch (e) {
-      console.warn("Backend API offline or loading locally:", e);
-    }
-  };
-
-  const handleLoadDemo = async () => {
-    setIsLoadingDemo(true);
-    try {
-      const res = await fetch(`${API_BASE}/demo/load`, { method: "POST" });
-      const data = await res.json();
-      if (data.success) {
-        // Fetch fresh profile and metrics
-        const pRes = await fetch(`${API_BASE}/dataset/profile`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ file_path: "data/sample/sample_resumes.csv", target_column: "job_role" }),
-        });
-        const pData = await pRes.json();
-        if (pData.success) setProfileData(pData.data);
-        await fetchMetrics();
-      }
-    } catch (e) {
-      alert("Failed to connect to FastAPI backend at http://localhost:8000. Ensure backend is running!");
+      if (!res.ok) throw new Error(data?.detail ?? "Unexpected server error.");
+      if (!data.success) throw new Error(data?.error?.message ?? "Unexpected server error.");
+      setResult(data.data);
+      setStep(4);
+      setStage("SUCCESS");
+    } catch (e: any) {
+      setError(e.message ?? "Unexpected server error.");
+      setStage("ERROR");
     } finally {
-      setIsLoadingDemo(false);
+      clearTimeout(t1); clearTimeout(t2);
     }
   };
 
-  const handleUploadDataset = async (file: File) => {
-    setIsUploading(true);
-    const formData = new FormData();
-    formData.append("file", file);
-
+  const tryDemo = async () => {
+    setIsDemo(true);
     try {
-      const res = await fetch(`${API_BASE}/dataset/upload`, {
-        method: "POST",
-        body: formData,
-      });
-      const data = await res.json();
-      if (data.success) {
-        setProfileData(data.data.profile);
-        alert(`Dataset '${file.name}' successfully uploaded & profiled!`);
-      } else {
-        alert(`Upload error: ${data.error?.message}`);
-      }
-    } catch (e) {
-      alert("Error uploading dataset.");
+      const res = await fetch("/sample_resume.pdf");
+      const blob = await res.blob();
+      const f = new File([blob], "sample_resume.pdf", { type: "application/pdf" });
+      setFile(f);
+      await runAnalysis(f);
+    } catch {
+      setError("Demo resume unavailable.");
+      setStage("ERROR");
     } finally {
-      setIsUploading(false);
+      setIsDemo(false);
     }
   };
 
-  const handleTrainPipeline = async (targetCol: string, textCols: string[], taskType: string) => {
-    setIsTraining(true);
-    try {
-      const res = await fetch(`${API_BASE}/train`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ target_column: targetCol, text_columns: textCols, task_type: taskType }),
-      });
-      const data = await res.json();
-      if (data.success) {
-        await fetchMetrics();
-        alert(`Pipeline successfully trained! Best Model: ${data.data.model}`);
-      } else {
-        alert(`Training failed: ${data.error?.message}`);
-      }
-    } catch (e) {
-      alert("Training connection error.");
-    } finally {
-      setIsTraining(false);
-    }
+  const reset = () => {
+    setStage("IDLE"); setFile(null); setResult(null); setError(""); setStep(0);
   };
 
-  const handleAnalyzeResume = async (text: string, candidateName: string) => {
-    setIsAnalyzing(true);
-    try {
-      const formData = new FormData();
-      formData.append("text", text);
-      formData.append("candidate_name", candidateName);
-
-      const res = await fetch(`${API_BASE}/analyze-resume`, {
-        method: "POST",
-        body: formData,
-      });
-      const data = await res.json();
-      if (data.success) {
-        setAnalysisResult(data.data);
-      }
-    } catch (e) {
-      alert("Analysis error.");
-    } finally {
-      setIsAnalyzing(false);
-    }
-  };
-
-  const handleMatchJob = async (resumeText: string, jobDescription: string) => {
-    setIsMatching(true);
-    try {
-      const res = await fetch(`${API_BASE}/match`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ resume_text: resumeText, job_description: jobDescription }),
-      });
-      const data = await res.json();
-      if (data.success) {
-        setMatchResult(data.data);
-      }
-    } catch (e) {
-      alert("Matching error.");
-    } finally {
-      setIsMatching(false);
-    }
-  };
-
-  const handleRankCandidates = async (jobDescription: string) => {
-    setIsRanking(true);
-    try {
-      const candidatesList = [
-        {
-          candidate_id: "c1",
-          candidate_name: "Alice Smith",
-          resume_text:
-            "Senior Data Scientist with 5 years experience in Python, Scikit-Learn, TensorFlow, SQL, AWS, and Machine Learning algorithms.",
-        },
-        {
-          candidate_id: "c2",
-          candidate_name: "Bob Jones",
-          resume_text:
-            "Full Stack Software Engineer skilled in React, TypeScript, Node.js, HTML, CSS, and AWS Cloud.",
-        },
-        {
-          candidate_id: "c3",
-          candidate_name: "Carol White",
-          resume_text:
-            "Data Analyst with expertise in SQL, Tableau, Power BI, Python, and statistical modeling.",
-        },
-      ];
-
-      const res = await fetch(`${API_BASE}/rank`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ candidates: candidatesList, job_description: jobDescription }),
-      });
-      const data = await res.json();
-      if (data.success) {
-        setRankings(data.data.rankings);
-      }
-    } catch (e) {
-      alert("Ranking error.");
-    } finally {
-      setIsRanking(false);
-    }
-  };
-
-  const handleQuickPredict = async (text: string) => {
-    setIsPredicting(true);
-    try {
-      const res = await fetch(`${API_BASE}/predict`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text }),
-      });
-      const data = await res.json();
-      if (data.success) {
-        setPredictionResult(data.data);
-      }
-    } catch (e) {
-      alert("Prediction connection error.");
-    } finally {
-      setIsPredicting(false);
-    }
-  };
+  const steps = ["Extracting text", "Cleaning resume content", "Running AI classification", "Preparing results"];
 
   return (
-    <div className="min-h-screen bg-[#090d16] text-slate-100 flex flex-col">
-      <Navbar
-        isTrained={metricsData?.status === "trained"}
-        modelName={metricsData?.model_name}
-        onLoadDemo={handleLoadDemo}
-        isDemoLoading={isLoadingDemo}
-      />
-
-      <main className="flex-1 max-w-7xl w-full mx-auto px-6 py-8 space-y-8">
-        {/* Hackathon Wizard Header */}
-        <HackathonWizard
-          onLoadDemo={handleLoadDemo}
-          onTrain={handleTrainPipeline}
-          profileData={profileData}
-          metricsData={metricsData}
-          isTraining={isTraining}
-        />
-
-        {/* Tab Navigation Controls */}
-        <div className="flex items-center gap-2 border-b border-slate-800 pb-2">
-          <button
-            onClick={() => setActiveTab("profiler")}
-            className={`px-4 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 transition-all ${
-              activeTab === "profiler"
-                ? "bg-indigo-600 text-white shadow-lg shadow-indigo-500/20"
-                : "text-slate-400 hover:text-white hover:bg-slate-900"
-            }`}
-          >
-            <Layers className="h-4 w-4" />
-            Dataset & Model Profiler
-          </button>
-
-          <button
-            onClick={() => setActiveTab("analyzer")}
-            className={`px-4 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 transition-all ${
-              activeTab === "analyzer"
-                ? "bg-indigo-600 text-white shadow-lg shadow-indigo-500/20"
-                : "text-slate-400 hover:text-white hover:bg-slate-900"
-            }`}
-          >
-            <Brain className="h-4 w-4" />
-            Resume Parser & Skill Extractor
-          </button>
-
-          <button
-            onClick={() => setActiveTab("matcher")}
-            className={`px-4 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 transition-all ${
-              activeTab === "matcher"
-                ? "bg-indigo-600 text-white shadow-lg shadow-indigo-500/20"
-                : "text-slate-400 hover:text-white hover:bg-slate-900"
-            }`}
-          >
-            <GitCompare className="h-4 w-4" />
-            Job Similarity Matcher
-          </button>
-
-          <button
-            onClick={() => setActiveTab("ranker")}
-            className={`px-4 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 transition-all ${
-              activeTab === "ranker"
-                ? "bg-indigo-600 text-white shadow-lg shadow-indigo-500/20"
-                : "text-slate-400 hover:text-white hover:bg-slate-900"
-            }`}
-          >
-            <Award className="h-4 w-4" />
-            Candidate Ranking Matrix
-          </button>
-        </div>
-
-        {/* Tab Content Views */}
-        {activeTab === "profiler" && (
-          <div className="space-y-8">
-            <DatasetProfiler
-              profileData={profileData}
-              onUpload={handleUploadDataset}
-              onTrain={handleTrainPipeline}
-              isUploading={isUploading}
-              isTraining={isTraining}
-            />
-
-            <ModelBenchmark metricsData={metricsData} />
-          </div>
-        )}
-
-        {activeTab === "analyzer" && (
-          <div className="space-y-8">
-            <ResumeAnalyzer
-              onAnalyze={handleAnalyzeResume}
-              analysisResult={analysisResult}
-              isAnalyzing={isAnalyzing}
-            />
-
-            {/* Quick Realtime Prediction Widget */}
-            <div className="glass-panel rounded-2xl p-6 border border-slate-800">
-              <h3 className="text-sm font-bold text-white mb-2 flex items-center gap-2">
-                <Cpu className="h-4 w-4 text-indigo-400" />
-                Real-Time Role Classification & Feature Explainability
-              </h3>
-              <p className="text-xs text-slate-400 mb-4">
-                Test model inference on any sample resume snippet
-              </p>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  placeholder="e.g. Python Developer with Django FastAPI React SQL experience"
-                  className="flex-1 bg-slate-900 border border-slate-700 text-white rounded-xl px-3 py-2 text-xs"
-                  id="quickPredictInput"
-                />
-                <button
-                  onClick={() => {
-                    const el = document.getElementById("quickPredictInput") as HTMLInputElement;
-                    if (el && el.value) handleQuickPredict(el.value);
-                  }}
-                  disabled={isPredicting}
-                  className="gradient-btn px-4 py-2 rounded-xl text-xs font-bold text-white shadow-md disabled:opacity-50"
-                >
-                  {isPredicting ? "Predicting..." : "Predict Role"}
-                </button>
-              </div>
-
-              {predictionResult && (
-                <div className="mt-4 p-4 bg-slate-900/60 rounded-xl border border-indigo-500/30 space-y-2">
-                  <div className="flex justify-between items-center text-xs">
-                    <span className="text-slate-300">Predicted Job Role:</span>
-                    <span className="text-emerald-400 font-bold text-sm">
-                      {predictionResult.prediction} ({(predictionResult.confidence * 100).toFixed(1)}%)
-                    </span>
-                  </div>
-                  <p className="text-xs text-slate-400">
-                    Model Used: <span className="text-slate-200">{predictionResult.model_used}</span>
-                  </p>
-                  {predictionResult.explanation?.top_terms && (
-                    <div className="pt-2 border-t border-slate-800">
-                      <span className="text-[11px] text-slate-400 block mb-1">Key Explanatory Words:</span>
-                      <div className="flex flex-wrap gap-1">
-                        {predictionResult.explanation.top_terms.map((t: any) => (
-                          <span
-                            key={t.term}
-                            className="px-2 py-0.5 rounded bg-slate-800 text-indigo-300 text-[10px]"
-                          >
-                            {t.term} ({t.weight})
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
+    <main className="min-h-screen bg-slate-950 text-slate-100">
+      <header className="sticky top-0 z-50 border-b border-slate-800/70 bg-slate-950/80 backdrop-blur-md">
+        <div className="max-w-6xl mx-auto flex items-center justify-between px-6 py-4">
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 rounded-xl bg-gradient-to-tr from-cyan-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-cyan-500/20">
+              <Sparkles className="h-5 w-5 text-white" />
+            </div>
+            <div>
+              <h1 className="text-lg font-bold tracking-tight text-white">ResumeForge AI</h1>
+              <p className="text-xs text-slate-400">AI-Powered Resume Classification</p>
             </div>
           </div>
-        )}
+          <nav className="hidden md:flex items-center gap-6 text-sm text-slate-300">
+            <a href="#dashboard" className="hover:text-white">Dashboard</a>
+            <a href="#analyze" className="hover:text-white">Analyze Resume</a>
+            <a href="#model" className="hover:text-white">About Model</a>
+          </nav>
+          <div className="flex items-center gap-2 text-xs text-emerald-300 bg-emerald-500/10 border border-emerald-500/30 rounded-full px-3 py-1">
+            <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+            AI Model Online
+          </div>
+        </div>
+      </header>
 
-        {activeTab === "matcher" && (
-          <JobMatcher onMatch={handleMatchJob} matchResult={matchResult} isMatching={isMatching} />
-        )}
+      <section id="dashboard" className="max-w-6xl mx-auto px-6 py-14 grid md:grid-cols-2 gap-10 items-center">
+        <div>
+          <h2 className="text-4xl md:text-5xl font-extrabold leading-tight bg-gradient-to-r from-white to-cyan-200 bg-clip-text text-transparent">
+            Turn a Resume into a Career Category — Instantly.
+          </h2>
+          <p className="mt-4 text-slate-400 text-lg">
+            Upload a resume and let ResumeForge AI analyze its content using NLP and machine learning.
+          </p>
+          <div className="mt-8 flex gap-4">
+            <a href="#analyze" className="inline-flex items-center gap-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-semibold px-6 py-3 transition">
+              Analyze Resume <ArrowRight className="h-4 w-4" />
+            </a>
+            <a href="#model" className="inline-flex items-center gap-2 rounded-xl border border-slate-700 hover:border-slate-500 px-6 py-3 text-slate-300 transition">
+              View Model
+            </a>
+          </div>
+        </div>
+        <div className="rounded-3xl border border-slate-800 bg-gradient-to-br from-slate-900 to-slate-900/40 p-8">
+          <div className="flex items-center gap-3 mb-6">
+            <Brain className="h-6 w-6 text-cyan-400" />
+            <span className="text-sm text-slate-300 font-medium">Neural Classification Pipeline</span>
+          </div>
+          <div className="space-y-3">
+            {["PDF", "Text Extraction", "Preprocessing", "TF-IDF", "Linear SVM", "Prediction"].map((s, i) => (
+              <div key={s} className="flex items-center gap-3">
+                <div className="h-2 w-2 rounded-full bg-cyan-400" style={{ opacity: 1 - i * 0.12 }} />
+                <div className="flex-1 h-8 rounded-lg bg-slate-800/60 border border-slate-700/60 flex items-center px-4 text-sm text-slate-300">{s}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
 
-        {activeTab === "ranker" && (
-          <CandidateRanker onRank={handleRankCandidates} rankings={rankings} isRanking={isRanking} />
-        )}
-      </main>
+      <section id="analyze" className="max-w-6xl mx-auto px-6 pb-16">
+        <div className="rounded-3xl border border-slate-800 bg-slate-900/40 p-8">
+          <h3 className="text-xl font-bold text-white flex items-center gap-2">
+            <UploadCloud className="h-5 w-5 text-cyan-400" /> Analyze a Resume
+          </h3>
 
-      <footer className="border-t border-slate-900 py-6 text-center text-xs text-slate-500">
-        ResumeForge AI 2026 — Built for Hackathon Excellence & Dataset Agnostic Intelligence
-      </footer>
-    </div>
+          {stage === "SUCCESS" && result ? (
+            <ResultView result={result} onReset={reset} />
+          ) : (
+            <>
+              <div
+                onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+                onDragLeave={() => setIsDragging(false)}
+                onDrop={onDrop}
+                className={`mt-6 rounded-2xl border-2 border-dashed p-12 text-center transition ${isDragging ? "border-cyan-400 bg-cyan-500/5" : "border-slate-700 hover:border-slate-600"}`}
+              >
+                <UploadCloud className="h-12 w-12 mx-auto text-slate-500" />
+                <p className="mt-4 text-slate-200 font-medium">Drop your resume here</p>
+                <p className="text-sm text-slate-500 mt-1">or</p>
+                <label className="mt-3 inline-flex cursor-pointer items-center gap-2 rounded-xl bg-slate-800 hover:bg-slate-700 px-5 py-2.5 text-sm transition">
+                  <FileText className="h-4 w-4" /> Browse PDF
+                  <input type="file" accept="application/pdf,.pdf" className="hidden" onChange={(e) => pickFile(e.target.files?.[0] ?? null)} />
+                </label>
+                <p className="mt-3 text-xs text-slate-500">PDF files only • Maximum recommended size: 10 MB</p>
+              </div>
+
+              {file && stage !== "ANALYZING" && (
+                <div className="mt-4 flex items-center justify-between rounded-xl border border-slate-700 bg-slate-800/50 px-4 py-3">
+                  <div className="flex items-center gap-3">
+                    <FileCheck2 className="h-5 w-5 text-cyan-400" />
+                    <span className="text-sm text-slate-200">{file.name}</span>
+                    <span className="text-xs text-slate-500">{(file.size / 1024).toFixed(0)} KB</span>
+                  </div>
+                  <button onClick={reset} aria-label="Remove file" className="text-slate-500 hover:text-white">
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+              )}
+
+              {stage === "ANALYZING" && (
+                <div className="mt-6 rounded-2xl border border-slate-800 bg-slate-900/60 p-6">
+                  <p className="text-slate-200 font-medium mb-4">Analyzing Resume…</p>
+                  <ul className="space-y-2">
+                    {steps.map((s, i) => (
+                      <li key={s} className="flex items-center gap-3 text-sm">
+                        {step > i + 1 ? <CheckCircle2 className="h-4 w-4 text-emerald-400" /> :
+                         step === i + 1 ? <span className="h-4 w-4 rounded-full border-2 border-cyan-400 border-t-transparent animate-spin" /> :
+                         <span className="h-4 w-4 rounded-full border-2 border-slate-700" />}
+                        <span className={step > i ? "text-slate-200" : "text-slate-600"}>{s}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {stage === "ERROR" && (
+                <div className="mt-4 flex items-start gap-3 rounded-xl border border-rose-500/40 bg-rose-500/10 p-4">
+                  <AlertTriangle className="h-5 w-5 text-rose-400 shrink-0" />
+                  <p className="text-sm text-rose-200 whitespace-pre-line">{error}</p>
+                </div>
+              )}
+
+              <div className="mt-6 flex flex-wrap gap-4">
+                <button
+                  disabled={!file || stage === "ANALYZING"}
+                  onClick={() => file && runAnalysis(file)}
+                  className="inline-flex items-center gap-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 disabled:opacity-40 disabled:cursor-not-allowed text-slate-950 font-semibold px-6 py-3 transition"
+                >
+                  <Activity className="h-4 w-4" /> Analyze
+                </button>
+                <button
+                  disabled={stage === "ANALYZING" || isDemo}
+                  onClick={tryDemo}
+                  className="inline-flex items-center gap-2 rounded-xl border border-slate-700 hover:border-slate-500 px-6 py-3 text-slate-300 transition disabled:opacity-40"
+                >
+                  <Sparkles className="h-4 w-4" /> {isDemo ? "Loading demo…" : "Try Demo Resume"}
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      </section>
+
+      <section id="model" className="max-w-6xl mx-auto px-6 pb-20 grid md:grid-cols-2 gap-8">
+        <div className="rounded-3xl border border-slate-800 bg-slate-900/40 p-8">
+          <h3 className="text-lg font-bold flex items-center gap-2"><Cpu className="h-5 w-5 text-cyan-400" /> Powered by Machine Learning</h3>
+          <dl className="mt-6 grid grid-cols-2 gap-y-3 text-sm">
+            <dt className="text-slate-500">Model</dt><dd className="text-slate-200 font-medium">Linear SVM</dd>
+            <dt className="text-slate-500">Features</dt><dd className="text-slate-200 font-medium">Word TF-IDF + Character TF-IDF</dd>
+            <dt className="text-slate-500">Categories</dt><dd className="text-slate-200 font-medium">24</dd>
+            <dt className="text-slate-500">Training Resumes</dt><dd className="text-slate-200 font-medium">2,500</dd>
+            <dt className="text-slate-500">Test Accuracy</dt><dd className="text-emerald-300 font-semibold">70.24%</dd>
+            <dt className="text-slate-500">Macro-F1</dt><dd className="text-emerald-300 font-semibold">68.18%</dd>
+            <dt className="text-slate-500">Weighted-F1</dt><dd className="text-emerald-300 font-semibold">69.29%</dd>
+          </dl>
+        </div>
+        <div className="rounded-3xl border border-slate-800 bg-slate-900/40 p-8">
+          <h3 className="text-lg font-bold flex items-center gap-2"><Layers className="h-5 w-5 text-cyan-400" /> Model Comparison</h3>
+          <table className="mt-6 w-full text-sm">
+            <thead>
+              <tr className="text-slate-500 text-left border-b border-slate-800">
+                <th className="pb-2">Model</th><th className="pb-2 text-right">Accuracy</th><th className="pb-2 text-right">Macro-F1</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr className="border-b border-slate-800/60">
+                <td className="py-2 text-slate-300">Logistic Regression</td>
+                <td className="py-2 text-right text-slate-400">67.02%</td>
+                <td className="py-2 text-right text-slate-400">62.24%</td>
+              </tr>
+              <tr>
+                <td className="py-2 text-cyan-300 font-semibold">Linear SVM <span className="ml-2 text-[10px] uppercase tracking-wider bg-cyan-500/10 border border-cyan-500/30 rounded-full px-2 py-0.5">Selected</span></td>
+                <td className="py-2 text-right text-cyan-300 font-semibold">70.24%</td>
+                <td className="py-2 text-right text-cyan-300 font-semibold">68.18%</td>
+              </tr>
+            </tbody>
+          </table>
+          <p className="mt-4 text-xs text-slate-500 flex items-center gap-1">
+            <GraduationCap className="h-3 w-3" /> Resume Insights (skills, education) extraction — Coming Soon
+          </p>
+        </div>
+      </section>
+    </main>
   );
 }

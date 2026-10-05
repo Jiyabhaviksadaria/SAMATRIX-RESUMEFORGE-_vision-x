@@ -4,7 +4,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from backend.routes import health, dataset, train, predict, analyze, match, metrics, demo
+from backend.routes import health, dataset, train, predict, analyze, match, metrics, demo, classify
 from backend.schemas import StandardResponse
 
 app = FastAPI(
@@ -45,6 +45,7 @@ app.include_router(analyze.router)
 app.include_router(match.router)
 app.include_router(metrics.router)
 app.include_router(demo.router)
+app.include_router(classify.router)
 
 
 if __name__ == "__main__":

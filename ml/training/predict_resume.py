@@ -9,6 +9,7 @@ Usage:
 from pathlib import Path
 import joblib
 import numpy as np
+from scipy.sparse import hstack
 
 ROOT = Path(__file__).resolve().parents[2]
 MODEL_DIR = ROOT / "models"
@@ -16,14 +17,17 @@ MODEL_DIR = ROOT / "models"
 
 def _load():
     model = joblib.load(MODEL_DIR / "best_model.joblib")
-    vectorizer = joblib.load(MODEL_DIR / "vectorizer.joblib")
+    vectorizers = joblib.load(MODEL_DIR / "vectorizer.joblib")
     encoder = joblib.load(MODEL_DIR / "label_encoder.joblib")
-    return model, vectorizer, encoder
+    return model, vectorizers, encoder
 
 
 def predict_resume(text: str, top_k: int = 3):
-    model, vectorizer, encoder = _load()
-    X = vectorizer.transform([text])
+    model, vectorizers, encoder = _load()
+
+    X_word = vectorizers["word"].transform([text])
+    X_char = vectorizers["char"].transform([text])
+    X = hstack([X_word, X_char], format="csr")
 
     predicted_id = model.predict(X)[0]
     predicted = encoder.inverse_transform([predicted_id])[0]
